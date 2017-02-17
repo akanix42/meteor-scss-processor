@@ -24,7 +24,7 @@
     "meteor-build-plugin-helper-check-npm-package": "^0.0.1",
     "meteor-build-plugin-helper-included-file": "0.0.2",
     "meteor-build-plugin-helper-path-helpers": "0.0.1",
-    "meteor-compiler-processor": "file:d:\\projects\\meteor-vue\\meteor-compiler-processor",
+    "meteor-compiler-processor": "file:d:\\projects\\npm\\meteor-compiler-processor",
     "ramda": "^0.23.0",
     "regenerator-runtime": "^0.10.1"
   }

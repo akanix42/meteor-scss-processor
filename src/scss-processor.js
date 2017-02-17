@@ -7,8 +7,8 @@ import cjson from 'cjson';
 import checkNpmPackage from 'meteor-build-plugin-helper-check-npm-package';
 
 export default class ScssProcessor extends Processor {
-  constructor({ globalVariables, ...otherOptions } = {}) {
-    super('SCSS compilation', otherOptions);
+  constructor({ globalVariables, ...otherOptions } = {}, compiler) {
+    super('SCSS compilation', otherOptions, compiler);
     this._processGlobalVariables(globalVariables);
     this._loadNodeSass();
   }
@@ -66,25 +66,27 @@ export default class ScssProcessor extends Processor {
     }
   }
 
-  async _process(file) {
-      const sourceFile = this._wrapFileForNodeSass(file);
-      const { css, sourceMap } = this._transpile(sourceFile);
-      file.contents = css;
-      file.sourceMap = sourceMap;
-      file.isPreprocessed = true;
-    return {};
+  async _process(file, result) {
+    console.log('initial result', JSON.stringify(result))
+    const sourceFile = this._wrapFileForNodeSass(file, result);
+    const { css, sourceMap } = this._transpile(sourceFile);
+    result.css = css;
+    result.maps.css = sourceMap;
+    console.log('scss processing result', JSON.stringify(result))
+
+    return result;
   }
 
-  _wrapFileForNodeSass(file) {
-    let contents = file.rawContents;
+  _wrapFileForNodeSass(file, result) {
+    let contents = result.scss || result.css || file.contents;
     if (this.globalVariablesText) {
       contents = `${this.globalVariablesText}\n\n${contents}`
     }
-
+    result.scss = contents;
     return { path: file.importPath, contents, file };
   }
 
-  _discoverImportPath(importPath) {
+  _calculatePotentialImportPaths(importPath) {
     const potentialPaths = [importPath];
     const potentialFileExtensions = this.fileExtensions;
 
@@ -95,13 +97,7 @@ export default class ScssProcessor extends Processor {
       [].concat(potentialPaths).forEach(potentialPath => potentialPaths.push(`${path.dirname(potentialPath)}/_${path.basename(potentialPath)}`));
     }
 
-    for (let i = 0, potentialPath = potentialPaths[i]; i < potentialPaths.length; i++, potentialPath = potentialPaths[i]) {
-      if (this.filesByName.has(potentialPath) || (fs.existsSync(potentialPaths[i]) && fs.lstatSync(potentialPaths[i]).isFile())) {
-        return potentialPath;
-      }
-    }
-
-    throw new Error(`File '${importPath}' not found at any of the following paths: ${JSON.stringify(potentialPaths)}`);
+    return potentialPaths;
   }
 
   _transpile(sourceFile) {
@@ -130,14 +126,15 @@ export default class ScssProcessor extends Processor {
 
   _importFile(rootFile, sourceFilePath, relativeTo) {
     try {
-      let importPath = PathHelpers.getPathRelativeToFile(sourceFilePath, relativeTo);
-      importPath = this._discoverImportPath(importPath);
-      let inputFile = this.filesByName.get(importPath);
-      if (inputFile) {
-        rootFile.file.referencedImportPaths.push(importPath);
-      } else {
-        this._createIncludedFile(importPath, rootFile);
-      }
+      let initialImportPath = PathHelpers.getPathRelativeToFile(sourceFilePath, relativeTo);
+      let potentialImportPaths = this._calculatePotentialImportPaths(initialImportPath);
+      // importPath = this._discoverImportPath(importPath);
+      let inputFile = this.compiler.importFile(potentialImportPaths, rootFile);
+      // if (inputFile) {
+      //   rootFile.file.referencedImportPaths.push(importPath);
+      // } else {
+      //   this._createIncludedFile(importPath, rootFile);
+      // }
 
       return this._wrapFileForNodeSassImport(inputFile);
     } catch (err) {
@@ -145,8 +142,8 @@ export default class ScssProcessor extends Processor {
     }
   }
 
-  _wrapFileForNodeSassImport(file) {
-    return { contents: file.rawContents, file: file.importPath };
+  _wrapFileForNodeSassImport(importResult) {
+    return { contents: importResult.scss || importResult.css, file: importResult.inputFile.importPath };
   }
 
 };
