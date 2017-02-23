@@ -67,12 +67,10 @@ export default class ScssProcessor extends Processor {
   }
 
   async _process(file, result) {
-    console.log('initial result', JSON.stringify(result))
     const sourceFile = this._wrapFileForNodeSass(file, result);
-    const { css, sourceMap } = this._transpile(sourceFile);
+    const { css, sourceMap } = await this._transpile(sourceFile);
     result.css = css;
     result.maps.css = sourceMap;
-    console.log('scss processing result', JSON.stringify(result))
 
     return result;
   }
@@ -100,7 +98,7 @@ export default class ScssProcessor extends Processor {
     return potentialPaths;
   }
 
-  _transpile(sourceFile) {
+  async _transpile(sourceFile) {
     const sassOptions = {
       sourceMap: true,
       sourceMapContents: true,
@@ -109,7 +107,9 @@ export default class ScssProcessor extends Processor {
       sourceMapRoot: '.',
       indentedSyntax: sourceFile.file.getExtension() === 'sass',
       outFile: `.${sourceFile.file.getBasename()}`,
-      importer: this._importFile.bind(this, sourceFile),
+      importer: (...args) => {
+        this._importFile(sourceFile, ...args)
+      },
       includePaths: [],
       file: sourceFile.path,
       data: sourceFile.contents
@@ -120,25 +120,31 @@ export default class ScssProcessor extends Processor {
       sassOptions.data = '$fakevariable : blue;';
     }
 
-    const output = this.sass.renderSync(sassOptions);
+    const output = await this._renderSass(sassOptions);
     return { css: output.css.toString('utf-8'), sourceMap: JSON.parse(output.map.toString('utf-8')) };
   }
 
-  _importFile(rootFile, sourceFilePath, relativeTo) {
+  _renderSass(options) {
+    return new Promise((resolve, reject) => {
+      this.sass.render(options, function (err, result) {
+        if (err)
+          reject(err);
+        else
+          resolve(result);
+      });
+    });
+  }
+
+  async _importFile(rootFile, sourceFilePath, relativeTo, done) {
     try {
       let initialImportPath = PathHelpers.getPathRelativeToFile(sourceFilePath, relativeTo);
       let potentialImportPaths = this._calculatePotentialImportPaths(initialImportPath);
-      // importPath = this._discoverImportPath(importPath);
-      let inputFile = this.compiler.importFile(potentialImportPaths, rootFile);
-      // if (inputFile) {
-      //   rootFile.file.referencedImportPaths.push(importPath);
-      // } else {
-      //   this._createIncludedFile(importPath, rootFile);
-      // }
-
-      return this._wrapFileForNodeSassImport(inputFile);
+      let importResult = await this.compiler.importFile(potentialImportPaths, rootFile);
+      done(this._wrapFileForNodeSassImport(importResult));
     } catch (err) {
-      return err;
+      console.error(err)
+      console.error(err.stack)
+      done(err);
     }
   }
 

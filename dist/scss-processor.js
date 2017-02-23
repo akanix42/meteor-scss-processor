@@ -4,6 +4,10 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 
+var _promise = require('babel-runtime/core-js/promise');
+
+var _promise2 = _interopRequireDefault(_promise);
+
 var _regenerator = require('babel-runtime/regenerator');
 
 var _regenerator2 = _interopRequireDefault(_regenerator);
@@ -151,7 +155,7 @@ var ScssProcessor = function (_Processor) {
     key: '_process',
     value: function () {
       var _ref2 = (0, _asyncToGenerator3.default)(_regenerator2.default.mark(function _callee(file, result) {
-        var sourceFile, _transpile2, css, sourceMap;
+        var sourceFile, _ref3, css, sourceMap;
 
         return _regenerator2.default.wrap(function _callee$(_context) {
           while (1) {
@@ -159,7 +163,13 @@ var ScssProcessor = function (_Processor) {
               case 0:
                 console.log('initial result', (0, _stringify2.default)(result));
                 sourceFile = this._wrapFileForNodeSass(file, result);
-                _transpile2 = this._transpile(sourceFile), css = _transpile2.css, sourceMap = _transpile2.sourceMap;
+                _context.next = 4;
+                return this._transpile(sourceFile);
+
+              case 4:
+                _ref3 = _context.sent;
+                css = _ref3.css;
+                sourceMap = _ref3.sourceMap;
 
                 result.css = css;
                 result.maps.css = sourceMap;
@@ -167,7 +177,7 @@ var ScssProcessor = function (_Processor) {
 
                 return _context.abrupt('return', result);
 
-              case 7:
+              case 11:
               case 'end':
                 return _context.stop();
             }
@@ -209,60 +219,124 @@ var ScssProcessor = function (_Processor) {
       }
 
       return potentialPaths;
-      //
-      // for (let i = 0,
-      //        potentialPath = potentialPaths[i]; i < potentialPaths.length; i++, potentialPath = potentialPaths[i]) {
-      //   if (this.filesByName.has(potentialPath) || (fs.existsSync(potentialPaths[i]) && fs.lstatSync(potentialPaths[i]).isFile())) {
-      //     return potentialPath;
-      //   }
-      // }
-      //
-      // throw new Error(`File '${importPath}' not found at any of the following paths: ${JSON.stringify(potentialPaths)}`);
     }
   }, {
     key: '_transpile',
-    value: function _transpile(sourceFile) {
-      var sassOptions = {
-        sourceMap: true,
-        sourceMapContents: true,
-        sourceMapEmbed: false,
-        sourceComments: false,
-        sourceMapRoot: '.',
-        indentedSyntax: sourceFile.file.getExtension() === 'sass',
-        outFile: '.' + sourceFile.file.getBasename(),
-        importer: this._importFile.bind(this, sourceFile),
-        includePaths: [],
-        file: sourceFile.path,
-        data: sourceFile.contents
-      };
+    value: function () {
+      var _ref4 = (0, _asyncToGenerator3.default)(_regenerator2.default.mark(function _callee2(sourceFile) {
+        var _this2 = this;
 
-      /* Empty options.data workaround from fourseven:scss */
-      if (!sassOptions.data.trim()) {
-        sassOptions.data = '$fakevariable : blue;';
+        var boundImport, sassOptions, output;
+        return _regenerator2.default.wrap(function _callee2$(_context2) {
+          while (1) {
+            switch (_context2.prev = _context2.next) {
+              case 0:
+                boundImport = this._importFile.bind(this, sourceFile);
+                sassOptions = {
+                  sourceMap: true,
+                  sourceMapContents: true,
+                  sourceMapEmbed: false,
+                  sourceComments: false,
+                  sourceMapRoot: '.',
+                  indentedSyntax: sourceFile.file.getExtension() === 'sass',
+                  outFile: '.' + sourceFile.file.getBasename(),
+                  importer: function importer() {
+                    for (var _len = arguments.length, args = Array(_len), _key = 0; _key < _len; _key++) {
+                      args[_key] = arguments[_key];
+                    }
+
+                    _this2._importFile.apply(_this2, [sourceFile].concat(args));
+                  },
+                  // function(url, prev, done) {
+                  //   boundImport(url, prev, done);
+                  // },
+                  includePaths: [],
+                  file: sourceFile.path,
+                  data: sourceFile.contents
+                };
+
+                /* Empty options.data workaround from fourseven:scss */
+
+                if (!sassOptions.data.trim()) {
+                  sassOptions.data = '$fakevariable : blue;';
+                }
+
+                _context2.next = 5;
+                return this._renderSass(sassOptions);
+
+              case 5:
+                output = _context2.sent;
+                return _context2.abrupt('return', { css: output.css.toString('utf-8'), sourceMap: JSON.parse(output.map.toString('utf-8')) });
+
+              case 7:
+              case 'end':
+                return _context2.stop();
+            }
+          }
+        }, _callee2, this);
+      }));
+
+      function _transpile(_x4) {
+        return _ref4.apply(this, arguments);
       }
 
-      var output = this.sass.renderSync(sassOptions);
-      return { css: output.css.toString('utf-8'), sourceMap: JSON.parse(output.map.toString('utf-8')) };
+      return _transpile;
+    }()
+  }, {
+    key: '_renderSass',
+    value: function _renderSass(options) {
+      var _this3 = this;
+
+      return new _promise2.default(function (resolve, reject) {
+        _this3.sass.render(options, function (err, result) {
+          if (err) reject(err);else resolve(result);
+        });
+      });
     }
   }, {
     key: '_importFile',
-    value: function _importFile(rootFile, sourceFilePath, relativeTo) {
-      try {
-        var initialImportPath = _meteorBuildPluginHelperPathHelpers2.default.getPathRelativeToFile(sourceFilePath, relativeTo);
-        var potentialImportPaths = this._calculatePotentialImportPaths(initialImportPath);
-        // importPath = this._discoverImportPath(importPath);
-        var inputFile = this.compiler.importFile(potentialImportPaths, rootFile);
-        // if (inputFile) {
-        //   rootFile.file.referencedImportPaths.push(importPath);
-        // } else {
-        //   this._createIncludedFile(importPath, rootFile);
-        // }
+    value: function () {
+      var _ref5 = (0, _asyncToGenerator3.default)(_regenerator2.default.mark(function _callee3(rootFile, sourceFilePath, relativeTo, done) {
+        var initialImportPath, potentialImportPaths, importResult;
+        return _regenerator2.default.wrap(function _callee3$(_context3) {
+          while (1) {
+            switch (_context3.prev = _context3.next) {
+              case 0:
+                _context3.prev = 0;
+                initialImportPath = _meteorBuildPluginHelperPathHelpers2.default.getPathRelativeToFile(sourceFilePath, relativeTo);
+                potentialImportPaths = this._calculatePotentialImportPaths(initialImportPath);
+                _context3.next = 5;
+                return this.compiler.importFile(potentialImportPaths, rootFile);
 
-        return this._wrapFileForNodeSassImport(inputFile);
-      } catch (err) {
-        return err;
+              case 5:
+                importResult = _context3.sent;
+
+                done(this._wrapFileForNodeSassImport(importResult));
+                _context3.next = 14;
+                break;
+
+              case 9:
+                _context3.prev = 9;
+                _context3.t0 = _context3['catch'](0);
+
+                console.error(_context3.t0);
+                console.error(_context3.t0.stack);
+                done(_context3.t0);
+
+              case 14:
+              case 'end':
+                return _context3.stop();
+            }
+          }
+        }, _callee3, this, [[0, 9]]);
+      }));
+
+      function _importFile(_x5, _x6, _x7, _x8) {
+        return _ref5.apply(this, arguments);
       }
-    }
+
+      return _importFile;
+    }()
   }, {
     key: '_wrapFileForNodeSassImport',
     value: function _wrapFileForNodeSassImport(importResult) {
